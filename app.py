@@ -114,7 +114,7 @@ def fetch_and_cache_movies(num_pages: int = 5):
     return movies
 
 
-def display_movie_card(movie: Dict, show_actions: bool = True):
+def display_movie_card(movie: Dict, show_actions: bool = True, key_suffix: str = ""):
     """Display a movie card with details"""
     col1, col2 = st.columns([1, 3])
     
@@ -155,16 +155,19 @@ def display_movie_card(movie: Dict, show_actions: bool = True):
         if show_actions:
             col_btn1, col_btn2 = st.columns(2)
             with col_btn1:
-                if st.button(f"Add to Watchlist", key=f"add_{movie['id']}"):
+                if st.button(f"Add to Watchlist", key=f"add_{movie['id']}_{key_suffix}"):
                     if st.session_state.watchlist_manager.add_to_watchlist(movie):
                         st.success("✅ Added to watchlist!")
                     else:
-                        st.info("ℹ️ Already in watchlist")
+                        st.warning("Already in watchlist")
             with col_btn2:
-                if st.button(f"Find Similar", key=f"similar_{movie['id']}"):
-                    st.session_state.find_similar = movie['title']
-                    st.session_state.page = "🤖 AI Recommendations"
-                    st.rerun()
+                if st.button(f"Sentiment Analysis", key=f"sentiment_{movie['id']}_{key_suffix}"):
+                    st.session_state[f"show_sentiment_{movie['id']}_{key_suffix}"] = True
+    
+    # Show sentiment if triggered
+    if st.session_state.get(f"show_sentiment_{movie['id']}_{key_suffix}", False):
+        # ...existing sentiment analysis code...
+        pass
 
 
 def main():
@@ -437,11 +440,11 @@ def show_ai_recommendations():
                 if recommendations:
                     st.success(f"Found {len(recommendations)} similar movies!")
                     
-                    for title, score in recommendations:
-                        movie_data = next((m for m in movies if m.get('title') == title), None)
+                    for idx, (movie_id, score) in enumerate(recommendations):
+                        movie_data = next((m for m in movies if m.get('id') == movie_id), None)
                         if movie_data:
                             st.write(f"**Similarity Score:** {score:.2f}")
-                            display_movie_card(movie_data)
+                            display_movie_card(movie_data, key_suffix=f"ai_rec_{idx}")
                             st.markdown("---")
                 else:
                     st.warning("Movie not found in our database. Try another title.")
@@ -571,6 +574,10 @@ def show_nlp_query():
     
     query = st.text_area("What kind of movies are you looking for?", height=100)
     
+    # Store NLP results in session state
+    if "nlp_results" not in st.session_state:
+        st.session_state.nlp_results = None
+    
     if query and st.button("Search", type="primary"):
         with st.spinner("Understanding your query with AI..."):
             # Use OpenRouter if available for enhanced understanding
@@ -645,8 +652,8 @@ def show_nlp_query():
                 st.success(response)
                 
                 # Display results
-                for movie in filtered_movies[:15]:
-                    display_movie_card(movie)
+                for idx, movie in enumerate(filtered_movies[:15]):
+                    display_movie_card(movie, key_suffix=f"nlp_{idx}")
                     st.markdown("---")
             else:
                 st.warning("No movies found matching your criteria. Try adjusting your search!")

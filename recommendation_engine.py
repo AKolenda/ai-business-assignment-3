@@ -346,3 +346,52 @@ class RecommendationEngine:
         recommendations = {}
         
         # Content-based recommendations
+        if movie_title:
+            content_recs = self.content_based_recommendations(movie_title, n_recommendations * 2)
+            for movie_id, score in content_recs:
+                movie_data = next((m for m in (all_movies or []) if m.get('id') == movie_id), None)
+                if movie_data:
+                    title = movie_data.get('title')
+                    if title:
+                        recommendations[title] = recommendations.get(title, 0) + score * 0.4
+        
+        # Collaborative filtering
+        if user_ratings:
+            collab_recs = self.collaborative_filtering_simple(
+                user_ratings, 
+                all_movies or [], 
+                n_recommendations * 2
+            )
+            for title, score in collab_recs:
+                recommendations[title] = recommendations.get(title, 0) + score * 0.3
+        
+        # Sentiment-based boost
+        if all_movies:
+            sentiment_recs = self.sentiment_based_recommendations(
+                all_movies, 
+                min_sentiment=0.2,
+                n_recommendations=n_recommendations * 2
+            )
+            for title, sentiment, rating in sentiment_recs:
+                if title in recommendations:
+                    # Boost score based on sentiment
+                    recommendations[title] += sentiment * 0.3
+        
+        # Sort by combined score
+        sorted_recs = sorted(
+            recommendations.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )[:n_recommendations]
+        
+        return sorted_recs
+    
+    def find_similar_movies(
+        self,
+        movie_title: str,
+        n_similar: int = 10,
+        similarity_threshold: float = 0.1
+    ) -> List[Tuple[str, float]]:
+        """Find movies similar to the given movie"""
+        similar = self.content_based_recommendations(movie_title, n_similar)
+        return [(movie_id, score) for movie_id, score in similar if score >= similarity_threshold]

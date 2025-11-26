@@ -24,7 +24,7 @@ A comprehensive movie recommendation system powered by AI and machine learning, 
 1. **NLP Interface**: Ask for movies in natural language (e.g., "Show me action movies from the 2010s")
 2. **Similarity Discovery**: Find movies similar to your favorites
 3. **Personal Watchlist**: Manage movies you want to watch and track watched movies
-4. **Data Visualizations**: 
+4. **Data Visualizations**:
    - Rating distribution histograms
    - Genre distribution pie charts
    - Movie timeline scatter plots
@@ -35,17 +35,20 @@ A comprehensive movie recommendation system powered by AI and machine learning, 
 ## 🚀 Technology Stack
 
 ### Backend
+
 - **Python 3.8+**
 - **Streamlit**: Web framework for interactive UI
 - **TMDB API**: Movie metadata and information
 
 ### NLP & Machine Learning
+
 - **NLTK**: Natural language processing
 - **spaCy**: Advanced NLP capabilities
 - **TextBlob**: Sentiment analysis
 - **scikit-learn**: Machine learning algorithms (TF-IDF, cosine similarity)
 
 ### Data Processing & Visualization
+
 - **pandas**: Data manipulation
 - **numpy**: Numerical computations
 - **plotly**: Interactive visualizations
@@ -54,22 +57,27 @@ A comprehensive movie recommendation system powered by AI and machine learning, 
 ## 📦 Installation
 
 ### Prerequisites
+
 - Python 3.8 or higher
 - TMDB API key (free from [themoviedb.org](https://www.themoviedb.org/))
 
 ### Step 1: Clone the Repository
+
 ```bash
 git clone https://github.com/AKolenda/Ai-for-business-assignment-3.git
 cd Ai-for-business-assignment-3
 ```
 
 ### Step 2: Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
 ### Step 3: Download NLTK Data
+
 The application will automatically download required NLTK data on first run, but you can pre-download:
+
 ```bash
 python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords')"
 ```
@@ -77,19 +85,15 @@ python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords')"
 ### Step 4: Configure API Key
 
 #### Option 1: Environment Variable
+
 ```bash
 export TMDB_API_KEY="your_api_key_here"
 ```
 
-#### Option 2: .env File
-Create a `.env` file:
-```bash
-cp .env.example .env
-# Edit .env and add your API key
-```
-
 #### Option 3: Streamlit Secrets
+
 Create `.streamlit/secrets.toml`:
+
 ```bash
 cp .streamlit/secrets.toml.example .streamlit/secrets.toml
 # Edit secrets.toml and add your API key
@@ -98,8 +102,11 @@ cp .streamlit/secrets.toml.example .streamlit/secrets.toml
 ## 🎯 Usage
 
 ### Running Locally
+
 ```bash
 streamlit run app.py
+OR
+python3 -m streamlit run app.py
 ```
 
 The application will open in your browser at `http://localhost:8501`
@@ -177,27 +184,35 @@ Ai-for-business-assignment-3/
 ## 🎨 Features in Detail
 
 ### Content-Based Filtering
+
 Uses TF-IDF vectorization and cosine similarity to find movies with similar:
+
 - Genres
 - Plot descriptions
 - Keywords
 - Cast and crew
 
 ### Sentiment Analysis
+
 Analyzes text using TextBlob to determine sentiment polarity:
+
 - Positive sentiment (>0): Uplifting, positive themes
 - Negative sentiment (<0): Dark, serious themes
 - Neutral sentiment (≈0): Balanced tone
 
 ### NLP Query Interface
+
 Understands natural language queries:
+
 - Temporal: "movies from the 90s", "2020 films"
 - Genre: "action movies", "romantic comedies"
 - Quality: "highly rated", "best movies"
 - Combined: "highly rated sci-fi from 2010s"
 
 ### Visualizations
+
 Interactive charts using Plotly:
+
 - Histogram of rating distributions
 - Pie chart of genre popularity
 - Timeline scatter plot of movies
@@ -220,6 +235,7 @@ This project is open source and available under the MIT License.
 ## 📞 Support
 
 If you encounter any issues or have questions:
+
 1. Check that your TMDB API key is correctly configured
 2. Ensure all dependencies are installed
 3. Review the error messages in the console

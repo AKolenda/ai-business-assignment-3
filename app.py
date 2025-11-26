@@ -19,29 +19,242 @@ from enhanced_features import (
 
 # Page configuration
 st.set_page_config(
-    page_title="AI Movie Recommender",
+    page_title="CineMatch AI | Smart Movie Recommendations",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# Custom CSS with branding
 st.markdown("""
 <style>
+    /* Brand Colors */
+    :root {
+        --primary-color: #E50914;
+        --secondary-color: #141414;
+        --accent-color: #F5C518;
+        --text-light: #FFFFFF;
+        --text-dark: #333333;
+    }
+    
+    /* Header Branding */
+    .brand-header {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        padding: 20px 30px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    
+    .brand-logo {
+        font-size: 2.5rem;
+        font-weight: 800;
+        background: linear-gradient(90deg, #E50914, #F5C518);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin: 0;
+        display: inline-block;
+    }
+    
+    .brand-tagline {
+        color: #a0a0a0;
+        font-size: 1rem;
+        margin-top: 5px;
+        font-style: italic;
+    }
+    
+    /* Sidebar Branding */
+    .sidebar-brand {
+        text-align: center;
+        padding: 15px;
+        background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .sidebar-logo {
+        font-size: 1.8rem;
+        font-weight: 800;
+        background: linear-gradient(90deg, #E50914, #F5C518);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .sidebar-tagline {
+        color: #888;
+        font-size: 0.75rem;
+        margin-top: 3px;
+    }
+    
+    /* Movie Card Styling */
     .movie-card {
         padding: 20px;
-        border-radius: 10px;
-        background-color: #f0f2f6;
-        margin: 10px 0;
+        border-radius: 12px;
+        background: linear-gradient(145deg, #f8f9fa 0%, #e9ecef 100%);
+        margin: 15px 0;
+        border-left: 4px solid #E50914;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
+    
+    /* Metric Cards */
     .metric-card {
-        background-color: #e1e5eb;
+        background: linear-gradient(145deg, #ffffff 0%, #f0f0f0 100%);
         padding: 15px;
-        border-radius: 8px;
+        border-radius: 10px;
         text-align: center;
+        border: 1px solid #e0e0e0;
+    }
+    
+    /* Navigation Styling */
+    .nav-item {
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin: 5px 0;
+        transition: all 0.3s ease;
+    }
+    
+    .nav-item:hover {
+        background-color: rgba(229, 9, 20, 0.1);
+    }
+    
+    /* Section Headers */
+    .section-header {
+        border-bottom: 3px solid #E50914;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    
+    /* Footer */
+    .brand-footer {
+        text-align: center;
+        padding: 20px;
+        margin-top: 40px;
+        border-top: 1px solid #e0e0e0;
+        color: #666;
+        font-size: 0.85rem;
+    }
+    
+    /* Button Styling */
+    .stButton > button {
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    /* Tab Styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px 8px 0 0;
+        padding: 10px 20px;
     }
 </style>
 """, unsafe_allow_html=True)
+
+# Initialize session state
+if 'tmdb_client' not in st.session_state:
+    api_key = os.getenv("TMDB_API_KEY") or st.secrets.get("TMDB_API_KEY", "")
+    if api_key:
+        st.session_state.tmdb_client = TMDBClient(api_key)
+    else:
+        st.session_state.tmdb_client = None
+
+if 'recommendation_engine' not in st.session_state:
+    st.session_state.recommendation_engine = RecommendationEngine()
+
+if 'watchlist_manager' not in st.session_state:
+    st.session_state.watchlist_manager = WatchlistManager()
+
+if 'genres' not in st.session_state:
+    st.session_state.genres = {}
+
+if 'movies_cache' not in st.session_state:
+    st.session_state.movies_cache = []
+
+# Initialize state for maintaining search/filter contexts
+if 'search_results' not in st.session_state:
+    st.session_state.search_results = []
+
+if 'filtered_results' not in st.session_state:
+    st.session_state.filtered_results = []
+
+if 'find_similar' not in st.session_state:
+    st.session_state.find_similar = None
+
+if 'trending_results' not in st.session_state:
+    st.session_state.trending_results = []
+
+if 'last_search_query' not in st.session_state:
+    st.session_state.last_search_query = ""
+
+# NLP query results persistence
+if 'nlp_query_results' not in st.session_state:
+    st.session_state.nlp_query_results = []
+
+if 'nlp_last_query' not in st.session_state:
+    st.session_state.nlp_last_query = ""
+
+if 'nlp_response_message' not in st.session_state:
+    st.session_state.nlp_response_message = ""
+
+# AI recommendations results persistence
+if 'ai_content_results' not in st.session_state:
+    st.session_state.ai_content_results = []
+
+if 'ai_sentiment_results' not in st.session_state:
+    st.session_state.ai_sentiment_results = []
+
+if 'ai_collab_results' not in st.session_state:
+    st.session_state.ai_collab_results = []
+
+if 'ai_hybrid_results' not in st.session_state:
+    st.session_state.ai_hybrid_results = []
+
+# OpenRouter API configuration
+if 'openrouter_api_key' not in st.session_state:
+    st.session_state.openrouter_api_key = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY", "")
+
+
+def render_brand_header():
+    """Render the main brand header"""
+    st.markdown("""
+    <div class="brand-header">
+        <div class="brand-logo">🎬 CineMatch AI</div>
+        <div class="brand-tagline">Your Personal Movie Discovery Engine • Powered by AI & TMDB</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_sidebar_brand():
+    """Render sidebar branding"""
+    st.markdown("""
+    <div class="sidebar-brand">
+        <div class="sidebar-logo">🎬 CineMatch</div>
+        <div class="sidebar-tagline">Smart Recommendations</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_footer():
+    """Render the brand footer"""
+    st.markdown("""
+    <div class="brand-footer">
+        <strong>CineMatch AI</strong> © 2025 | Powered by TMDB & OpenRouter<br>
+        <span style="font-size: 0.75rem;">Built with ❤️ using Streamlit • Data provided by The Movie Database</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ...existing code for session state initialization...
 
 # Initialize session state
 if 'tmdb_client' not in st.session_state:
@@ -284,9 +497,8 @@ def display_movie_card(movie: Dict, show_actions: bool = True, key_suffix: str =
 def main():
     """Main application"""
     
-    # Title
-    st.title("🎬 AI-Powered Movie Recommendation System")
-    st.markdown("---")
+    # Render main brand header
+    render_brand_header()
     
     # Check API key
     if st.session_state.tmdb_client is None:
@@ -318,47 +530,70 @@ def main():
     if 'page' not in st.session_state:
         st.session_state.page = "🏠 Home"
     
-    # Sidebar
+    # Sidebar with branding
     with st.sidebar:
-        st.header("🎯 Navigation")
+        render_sidebar_brand()
+        
+        st.markdown("### 🎯 Navigation")
+        
+        # Organized navigation sections
+        st.markdown("**Discover**")
         page = st.radio(
             "Choose a feature:",
             [
                 "🏠 Home",
                 "🔍 Search & Filter",
+                "🔥 Trending",
                 "🤖 AI Recommendations",
                 "💬 NLP Query",
                 "📊 Visualizations",
-                "🔥 Trending",
                 "📝 My Watchlist",
                 "⚖️ Compare Movies"
             ],
             index=[
                 "🏠 Home",
                 "🔍 Search & Filter",
+                "🔥 Trending",
                 "🤖 AI Recommendations",
                 "💬 NLP Query",
                 "📊 Visualizations",
-                "🔥 Trending",
                 "📝 My Watchlist",
                 "⚖️ Compare Movies"
             ].index(st.session_state.page) if st.session_state.page in [
                 "🏠 Home",
                 "🔍 Search & Filter",
+                "🔥 Trending",
                 "🤖 AI Recommendations",
                 "💬 NLP Query",
                 "📊 Visualizations",
-                "🔥 Trending",
                 "📝 My Watchlist",
                 "⚖️ Compare Movies"
-            ] else 0
+            ] else 0,
+            label_visibility="collapsed"
         )
         
-        # Update session state page
         st.session_state.page = page
         
         st.markdown("---")
-        st.caption("Powered by TMDB API")
+        
+        # Quick stats in sidebar
+        watchlist_count = len(st.session_state.watchlist_manager.get_watchlist())
+        watched_count = len(st.session_state.watchlist_manager.get_watched())
+        
+        st.markdown("### 📈 Your Stats")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Watchlist", watchlist_count)
+        with col2:
+            st.metric("Watched", watched_count)
+        
+        st.markdown("---")
+        st.markdown("""
+        <div style="text-align: center; color: #666; font-size: 0.75rem;">
+            <strong>CineMatch AI</strong><br>
+            Powered by TMDB
+        </div>
+        """, unsafe_allow_html=True)
     
     # Main content based on selected page
     if page == "🏠 Home":
@@ -377,62 +612,97 @@ def main():
         show_watchlist()
     elif page == "⚖️ Compare Movies":
         show_comparison()
+    
+    # Render footer
+    render_footer()
 
 
 def show_home():
-    """Home page"""
-    st.header("Welcome to AI Movie Recommender! 🎬")
+    """Home page with branding"""
+    st.markdown('<h2 class="section-header">Welcome to CineMatch AI! 🎬</h2>', unsafe_allow_html=True)
     
     st.markdown("""
-    ### Features:
+    > *"Discover your next favorite movie with the power of artificial intelligence."*
     
-    #### 🎯 Multiple Recommendation Approaches:
-    - **Content-Based Filtering**: Find movies similar to ones you love
-    - **Sentiment Analysis**: Discover movies with positive reviews
-    - **Collaborative Filtering**: Get recommendations based on your ratings
-    - **Hybrid System**: Combines all approaches for best results
+    ### 🌟 What Makes CineMatch Special?
     
-    #### 🔍 Advanced Filters:
-    - **Temporal**: Filter by year, decade
-    - **Quality**: Minimum rating, vote count
-    - **Content**: Runtime, language
-    - **Personnel**: Actors, directors
-    - **Genres**: All major genres
-    
-    #### ✨ Enhanced Features:
-    - **NLP Interface**: Ask questions in natural language
-    - **Similarity Discovery**: Find movies like your favorites
-    - **Personal Watchlist**: Track movies you want to watch
-    - **Visualizations**: Beautiful charts and graphs
-    - **Trending Movies**: See what's hot right now
-    - **Movie Comparisons**: Compare multiple movies side-by-side
+    CineMatch AI combines multiple recommendation technologies to help you find the perfect movie for any mood, taste, or occasion.
     """)
     
-    # Quick stats
+    # Feature cards
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        #### 🎯 Smart Recommendations
+        - **Content-Based**: Find movies similar to ones you love
+        - **Sentiment Analysis**: Discover movies with positive vibes
+        - **Collaborative**: Personalized picks based on your ratings
+        - **Hybrid**: Best of all approaches combined
+        """)
+        
+        st.markdown("""
+        #### 🔍 Powerful Search
+        - Filter by year, decade, genre
+        - Quality filters (rating, vote count)
+        - Runtime and language options
+        - Cast and director search
+        """)
+    
+    with col2:
+        st.markdown("""
+        #### 💬 Natural Language
+        - Ask in plain English
+        - AI understands your preferences
+        - Smart query parsing
+        - Contextual results
+        """)
+        
+        st.markdown("""
+        #### ✨ Enhanced Features
+        - Personal watchlist tracking
+        - Beautiful visualizations
+        - Trending movies feed
+        - Side-by-side comparisons
+        """)
+    
     st.markdown("---")
-    st.subheader("📈 Quick Stats")
+    
+    # Quick stats
+    st.markdown("### 📊 Platform Overview")
     
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Features", "6+")
+        st.metric("🎬 Features", "8+", help="Total platform features")
     with col2:
-        st.metric("Recommendation Types", "4")
+        st.metric("🤖 AI Models", "4", help="Recommendation approaches")
     with col3:
-        st.metric("Filter Options", "10+")
+        st.metric("🎛️ Filters", "10+", help="Search filter options")
     with col4:
         watchlist_count = len(st.session_state.watchlist_manager.get_watchlist())
-        st.metric("Your Watchlist", watchlist_count)
+        st.metric("📝 Your Watchlist", watchlist_count, help="Movies in your watchlist")
+    
+    st.markdown("---")
+    
+    # Quick start guide
+    st.markdown("### 🚀 Quick Start Guide")
+    st.info("""
+    **New here? Try these steps:**
+    1. 🔥 Check out **Trending** to see what's hot right now
+    2. 🔍 Use **Search & Filter** to find specific movies
+    3. 🤖 Try **AI Recommendations** with a movie you love
+    4. 💬 Ask a question in **NLP Query** like "Show me 90s comedies"
+    5. 📝 Save movies to **My Watchlist** to track what you want to watch
+    """)
 
 
 def show_search_and_filter():
     """Search and filter page"""
-    st.header("🔍 Search & Filter Movies")
+    st.markdown('<h2 class="section-header">🔍 Search & Filter Movies</h2>', unsafe_allow_html=True)
     
-    # Search bar
     search_query = st.text_input("Search for a movie:", placeholder="Enter movie title...", value=st.session_state.last_search_query)
     
-    # Search button
     if st.button("Search", key="search_btn") or (search_query and search_query != st.session_state.last_search_query):
         if search_query:
             st.session_state.last_search_query = search_query
@@ -447,10 +717,8 @@ def show_search_and_filter():
                 else:
                     st.session_state.search_results = []
     
-    # Display search results if available
     if st.session_state.search_results:
         st.success(f"Found {len(st.session_state.search_results)} results")
-        
         for movie in st.session_state.search_results:
             display_movie_card(movie)
             st.markdown("---")
@@ -460,7 +728,6 @@ def show_search_and_filter():
     st.markdown("---")
     st.subheader("🎛️ Advanced Filters")
     
-    # Filters in expandable section for better UX
     with st.expander("📋 Filter Options", expanded=False):
         col1, col2 = st.columns(2)
         
@@ -486,10 +753,8 @@ def show_search_and_filter():
     
     if st.button("Apply Filters & Search", type="primary"):
         with st.spinner("Filtering movies..."):
-            # Fetch movies
             movies = fetch_and_cache_movies(3)
             
-            # Apply filters
             filters = {
                 'min_year': min_year,
                 'max_year': max_year,
@@ -504,10 +769,8 @@ def show_search_and_filter():
             
             st.session_state.filtered_results = MovieFilters.apply_filters(movies, filters)
     
-    # Display filtered results if available
     if st.session_state.filtered_results:
         st.success(f"Found {len(st.session_state.filtered_results)} movies matching your criteria")
-        
         for movie in st.session_state.filtered_results[:20]:
             display_movie_card(movie)
             st.markdown("---")
@@ -515,45 +778,39 @@ def show_search_and_filter():
 
 def show_ai_recommendations():
     """AI recommendations page with improved movie matching"""
-    st.header("🤖 AI-Powered Recommendations")
+    st.markdown('<h2 class="section-header">🤖 AI-Powered Recommendations</h2>', unsafe_allow_html=True)
     
     tab1, tab2, tab3, tab4 = st.tabs([
-        "Content-Based",
-        "Sentiment Analysis",
-        "Collaborative",
-        "Hybrid"
+        "🎯 Content-Based",
+        "💭 Sentiment Analysis",
+        "👥 Collaborative",
+        "⚡ Hybrid"
     ])
     
     with tab1:
         st.subheader("Content-Based Filtering")
         st.write("Find movies similar to ones you love based on genres, cast, plot, and more.")
         
-        # Check if we came from "Find Similar" button
         default_title = st.session_state.find_similar if st.session_state.find_similar else ""
         movie_title = st.text_input("Enter a movie you like:", value=default_title, key="content_based")
         
-        # Auto-trigger search if we came from "Find Similar"
         auto_search = bool(st.session_state.find_similar)
         if st.session_state.find_similar:
-            st.session_state.find_similar = None  # Clear the flag
+            st.session_state.find_similar = None
         
         if (movie_title and st.button("Get Recommendations", key="btn_content")) or (movie_title and auto_search):
             with st.spinner("Analyzing movie features..."):
-                # First, search TMDB for the movie to get proper details
                 search_results = st.session_state.tmdb_client.search_movies(movie_title)
                 
                 found_movie = None
                 if 'results' in search_results and search_results['results']:
-                    # Get the first (best) match
                     found_movie = st.session_state.tmdb_client.get_movie_details(
                         search_results['results'][0]['id']
                     )
                     st.info(f"🎯 Found: **{found_movie.get('title')}** ({found_movie.get('release_date', '')[:4]})")
                 
-                # Fetch and prepare cached movies
                 movies = fetch_and_cache_movies(5)
                 
-                # Add the found movie to cache if not present
                 if found_movie:
                     movie_ids = [m.get('id') for m in movies]
                     if found_movie.get('id') not in movie_ids:
@@ -562,7 +819,6 @@ def show_ai_recommendations():
                 
                 st.session_state.recommendation_engine.prepare_data(movies)
                 
-                # Get recommendations using the exact title from TMDB
                 search_title = found_movie.get('title') if found_movie else movie_title
                 recommendations = st.session_state.recommendation_engine.content_based_recommendations(
                     search_title, 10
@@ -575,7 +831,6 @@ def show_ai_recommendations():
                         if movie_data:
                             st.session_state.ai_content_results.append((movie_data, score))
                 else:
-                    # Try fuzzy matching as fallback
                     recommendations = st.session_state.recommendation_engine.fuzzy_content_recommendations(
                         movie_title, movies, 10
                     )
@@ -588,7 +843,6 @@ def show_ai_recommendations():
                     else:
                         st.session_state.ai_content_results = []
         
-        # Display results
         if st.session_state.ai_content_results:
             st.success(f"Found {len(st.session_state.ai_content_results)} similar movies!")
             for idx, (movie_data, score) in enumerate(st.session_state.ai_content_results):
@@ -619,7 +873,6 @@ def show_ai_recommendations():
                         if movie_data:
                             st.session_state.ai_sentiment_results.append((movie_data, sentiment, rating))
         
-        # Display results
         if st.session_state.ai_sentiment_results:
             st.success(f"Found {len(st.session_state.ai_sentiment_results)} movies with positive sentiment!")
             for idx, (movie_data, sentiment, rating) in enumerate(st.session_state.ai_sentiment_results):
@@ -633,7 +886,6 @@ def show_ai_recommendations():
         
         st.info("Rate some movies to get personalized recommendations!")
         
-        # Get user ratings
         user_ratings = st.session_state.watchlist_manager.get_ratings()
         
         if user_ratings:
@@ -660,7 +912,6 @@ def show_ai_recommendations():
                             if movie_data:
                                 st.session_state.ai_collab_results.append((movie_data, score))
         
-        # Display results
         if st.session_state.ai_collab_results:
             st.success(f"Found {len(st.session_state.ai_collab_results)} recommendations based on your ratings!")
             for idx, (movie_data, score) in enumerate(st.session_state.ai_collab_results):
@@ -678,7 +929,6 @@ def show_ai_recommendations():
             with st.spinner("Combining all recommendation approaches..."):
                 movies = fetch_and_cache_movies(5)
                 
-                # If user provided a movie, search for it first
                 if movie_for_hybrid:
                     search_results = st.session_state.tmdb_client.search_movies(movie_for_hybrid)
                     if 'results' in search_results and search_results['results']:
@@ -711,7 +961,6 @@ def show_ai_recommendations():
                         if movie_data:
                             st.session_state.ai_hybrid_results.append((movie_data, score))
         
-        # Display results
         if st.session_state.ai_hybrid_results:
             st.success(f"Found {len(st.session_state.ai_hybrid_results)} hybrid recommendations!")
             for idx, (movie_data, score) in enumerate(st.session_state.ai_hybrid_results):
@@ -724,7 +973,7 @@ def show_ai_recommendations():
 
 def show_nlp_query():
     """NLP query interface with OpenRouter AI - with persistent results"""
-    st.header("💬 Natural Language Movie Search")
+    st.markdown('<h2 class="section-header">💬 Natural Language Movie Search</h2>', unsafe_allow_html=True)
     st.write("Ask for movies in plain English - powered by AI!")
     
     # Check if OpenRouter API key is configured
@@ -744,12 +993,11 @@ def show_nlp_query():
                 st.rerun()
     
     st.markdown("""
-    **Try queries like:**
+    **💡 Try queries like:**
     - "Show me action movies from the 2010s"
     - "Find highly rated comedies"
     - "Romantic movies from the 90s"
     - "Sci-fi thrillers with good ratings"
-    - "What are some good horror movies with at least a 7 rating?"
     """)
     
     query = st.text_area("What kind of movies are you looking for?", height=100, value=st.session_state.nlp_last_query)
@@ -758,7 +1006,6 @@ def show_nlp_query():
         st.session_state.nlp_last_query = query
         
         with st.spinner("Understanding your query with AI..."):
-            # Use OpenRouter if available for enhanced understanding
             if st.session_state.openrouter_api_key:
                 try:
                     openrouter = OpenRouterClient(st.session_state.openrouter_api_key)
@@ -776,15 +1023,12 @@ def show_nlp_query():
                     
                     ai_response = openrouter.query(query, system_prompt)
                     
-                    # Try to extract JSON from response
                     try:
-                        # Look for JSON in the response
                         json_match = re.search(r'\{[^}]+\}', ai_response)
                         if json_match:
                             params = json.loads(json_match.group())
                             st.write("**AI Understood:**", params)
                         else:
-                            # Fallback to basic parsing
                             params = NLPInterface.parse_query(query)
                             st.write("**Detected Parameters:**", params)
                     except json.JSONDecodeError:
@@ -795,14 +1039,11 @@ def show_nlp_query():
                     params = NLPInterface.parse_query(query)
                     st.write("**Detected Parameters:**", params)
             else:
-                # Basic pattern matching fallback
                 params = NLPInterface.parse_query(query)
                 st.write("**Detected Parameters:**", params)
             
-            # Fetch movies
             movies = fetch_and_cache_movies(5)
             
-            # Build filters from params
             filters = {}
             
             if 'year' in params:
@@ -818,22 +1059,18 @@ def show_nlp_query():
             if 'genres' in params:
                 filters['genre_names'] = params['genres']
             
-            # Apply filters
             if filters:
                 filtered_movies = MovieFilters.apply_filters(movies, filters)
             else:
                 filtered_movies = movies[:20]
             
-            # Store results in session state
             st.session_state.nlp_query_results = filtered_movies[:15]
             
-            # Generate response
             if filtered_movies:
                 st.session_state.nlp_response_message = NLPInterface.generate_response(filtered_movies, query)
             else:
                 st.session_state.nlp_response_message = ""
     
-    # Display persisted results
     if st.session_state.nlp_response_message:
         st.success(st.session_state.nlp_response_message)
     
@@ -847,7 +1084,7 @@ def show_nlp_query():
 
 def show_visualizations():
     """Visualizations page"""
-    st.header("📊 Movie Data Visualizations")
+    st.markdown('<h2 class="section-header">📊 Movie Data Visualizations</h2>', unsafe_allow_html=True)
     
     with st.spinner("Loading movie data..."):
         movies = fetch_and_cache_movies(5)
@@ -857,10 +1094,10 @@ def show_visualizations():
         return
     
     tab1, tab2, tab3, tab4 = st.tabs([
-        "Rating Distribution",
-        "Genre Analysis",
-        "Timeline",
-        "Top Actors"
+        "📈 Rating Distribution",
+        "🎭 Genre Analysis",
+        "📅 Timeline",
+        "🌟 Top Actors"
     ])
     
     with tab1:
@@ -886,7 +1123,7 @@ def show_visualizations():
 
 def show_trending():
     """Trending movies page"""
-    st.header("🔥 Trending Movies")
+    st.markdown('<h2 class="section-header">🔥 Trending Movies</h2>', unsafe_allow_html=True)
     
     col1, col2 = st.columns([2, 1])
     
@@ -894,7 +1131,6 @@ def show_trending():
         time_window = st.radio("Time Period:", ["Today", "This Week"])
     
     with col2:
-        # Add filter gear icon functionality
         with st.expander("⚙️ Filters", expanded=False):
             min_rating_trending = st.slider("Minimum Rating", 0.0, 10.0, 0.0, 0.5, key="trending_rating")
     
@@ -911,7 +1147,6 @@ def show_trending():
                     if details:
                         st.session_state.trending_results.append(details)
     
-    # Apply rating filter if set
     if st.session_state.trending_results:
         filtered_trending = [m for m in st.session_state.trending_results if m.get('vote_average', 0) >= min_rating_trending]
         
@@ -927,9 +1162,9 @@ def show_trending():
 
 def show_watchlist():
     """Watchlist management page"""
-    st.header("📝 My Watchlist")
+    st.markdown('<h2 class="section-header">📝 My Watchlist</h2>', unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["To Watch", "Watched"])
+    tab1, tab2 = st.tabs(["📋 To Watch", "✅ Watched"])
     
     with tab1:
         watchlist = st.session_state.watchlist_manager.get_watchlist()
@@ -986,11 +1221,10 @@ def show_watchlist():
 
 def show_comparison():
     """Movie comparison page"""
-    st.header("⚖️ Compare Movies")
+    st.markdown('<h2 class="section-header">⚖️ Compare Movies</h2>', unsafe_allow_html=True)
     
     st.write("Search and select movies to compare:")
     
-    # Search for movies to compare
     search1 = st.text_input("Search for first movie:", key="compare1")
     search2 = st.text_input("Search for second movie:", key="compare2")
     

@@ -79,13 +79,36 @@ if 'trending_results' not in st.session_state:
 if 'last_search_query' not in st.session_state:
     st.session_state.last_search_query = ""
 
+# NLP query results persistence
+if 'nlp_query_results' not in st.session_state:
+    st.session_state.nlp_query_results = []
+
+if 'nlp_last_query' not in st.session_state:
+    st.session_state.nlp_last_query = ""
+
+if 'nlp_response_message' not in st.session_state:
+    st.session_state.nlp_response_message = ""
+
+# AI recommendations results persistence
+if 'ai_content_results' not in st.session_state:
+    st.session_state.ai_content_results = []
+
+if 'ai_sentiment_results' not in st.session_state:
+    st.session_state.ai_sentiment_results = []
+
+if 'ai_collab_results' not in st.session_state:
+    st.session_state.ai_collab_results = []
+
+if 'ai_hybrid_results' not in st.session_state:
+    st.session_state.ai_hybrid_results = []
+
 # OpenRouter API configuration
 if 'openrouter_api_key' not in st.session_state:
     st.session_state.openrouter_api_key = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY", "")
 
 
 def fetch_and_cache_movies(num_pages: int = 5):
-    """Fetch movies and cache them"""
+    """Fetch movies and cache them for recommendation engine"""
     if st.session_state.tmdb_client is None:
         return []
     
@@ -114,6 +137,69 @@ def fetch_and_cache_movies(num_pages: int = 5):
     return movies
 
 
+def analyze_movie_sentiment(movie: Dict) -> Dict:
+    """Analyze sentiment of a movie's overview and reviews"""
+    from textblob import TextBlob
+    
+    results = {
+        'overview_sentiment': 0.0,
+        'overview_subjectivity': 0.0,
+        'review_sentiments': [],
+        'avg_review_sentiment': 0.0,
+        'overall_sentiment': 0.0,
+        'sentiment_label': 'Neutral'
+    }
+    
+    # Analyze overview
+    overview = movie.get('overview', '')
+    if overview:
+        blob = TextBlob(overview)
+        results['overview_sentiment'] = blob.sentiment.polarity
+        results['overview_subjectivity'] = blob.sentiment.subjectivity
+    
+    # Analyze reviews if available
+    if 'reviews' in movie and movie['reviews']:
+        if isinstance(movie['reviews'], dict) and 'results' in movie['reviews']:
+            for review in movie['reviews']['results'][:5]:
+                content = review.get('content', '')
+                if content:
+                    review_blob = TextBlob(content[:1000])  # Limit text length
+                    sentiment = review_blob.sentiment.polarity
+                    results['review_sentiments'].append({
+                        'author': review.get('author', 'Anonymous'),
+                        'sentiment': sentiment,
+                        'excerpt': content[:200] + '...' if len(content) > 200 else content
+                    })
+            
+            if results['review_sentiments']:
+                results['avg_review_sentiment'] = sum(
+                    r['sentiment'] for r in results['review_sentiments']
+                ) / len(results['review_sentiments'])
+    
+    # Calculate overall sentiment
+    if results['review_sentiments']:
+        results['overall_sentiment'] = (
+            results['overview_sentiment'] * 0.3 + 
+            results['avg_review_sentiment'] * 0.7
+        )
+    else:
+        results['overall_sentiment'] = results['overview_sentiment']
+    
+    # Determine sentiment label
+    if results['overall_sentiment'] > 0.3:
+        results['sentiment_label'] = 'Very Positive 😊'
+    elif results['overall_sentiment'] > 0.1:
+        results['sentiment_label'] = 'Positive 🙂'
+    elif results['overall_sentiment'] > -0.1:
+        results['sentiment_label'] = 'Neutral 😐'
+    elif results['overall_sentiment'] > -0.3:
+        results['sentiment_label'] = 'Negative 😕'
+    else:
+        results['sentiment_label'] = 'Very Negative 😞'
+    
+    return results
+
+
 def display_movie_card(movie: Dict, show_actions: bool = True, key_suffix: str = ""):
     """Display a movie card with details"""
     col1, col2 = st.columns([1, 3])
@@ -123,7 +209,7 @@ def display_movie_card(movie: Dict, show_actions: bool = True, key_suffix: str =
         if poster_path:
             st.image(
                 f"https://image.tmdb.org/t/p/w200{poster_path}",
-                use_column_width=True
+                use_container_width=True
             )
     
     with col2:
@@ -155,19 +241,44 @@ def display_movie_card(movie: Dict, show_actions: bool = True, key_suffix: str =
         if show_actions:
             col_btn1, col_btn2 = st.columns(2)
             with col_btn1:
-                if st.button(f"Add to Watchlist", key=f"add_{movie['id']}_{key_suffix}"):
+                if st.button(f"➕ Add to Watchlist", key=f"add_{movie['id']}_{key_suffix}"):
                     if st.session_state.watchlist_manager.add_to_watchlist(movie):
                         st.success("✅ Added to watchlist!")
                     else:
                         st.warning("Already in watchlist")
             with col_btn2:
-                if st.button(f"Sentiment Analysis", key=f"sentiment_{movie['id']}_{key_suffix}"):
+                if st.button(f"📊 Sentiment Analysis", key=f"sentiment_{movie['id']}_{key_suffix}"):
                     st.session_state[f"show_sentiment_{movie['id']}_{key_suffix}"] = True
     
-    # Show sentiment if triggered
+    # Show sentiment analysis if triggered
     if st.session_state.get(f"show_sentiment_{movie['id']}_{key_suffix}", False):
-        # ...existing sentiment analysis code...
-        pass
+        with st.expander("📊 Sentiment Analysis Results", expanded=True):
+            sentiment_data = analyze_movie_sentiment(movie)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Overall Sentiment", sentiment_data['sentiment_label'])
+            with col2:
+                st.metric("Sentiment Score", f"{sentiment_data['overall_sentiment']:.2f}")
+            with col3:
+                st.metric("Overview Subjectivity", f"{sentiment_data['overview_subjectivity']:.2f}")
+            
+            st.write("**Overview Analysis:**")
+            st.write(f"- Polarity: {sentiment_data['overview_sentiment']:.2f} (-1 = negative, +1 = positive)")
+            st.write(f"- Subjectivity: {sentiment_data['overview_subjectivity']:.2f} (0 = objective, 1 = subjective)")
+            
+            if sentiment_data['review_sentiments']:
+                st.write("**Review Sentiments:**")
+                for review in sentiment_data['review_sentiments']:
+                    sentiment_emoji = "😊" if review['sentiment'] > 0.1 else "😐" if review['sentiment'] > -0.1 else "😕"
+                    st.write(f"- **{review['author']}** {sentiment_emoji} (Score: {review['sentiment']:.2f})")
+                    st.caption(f"  \"{review['excerpt']}\"")
+            else:
+                st.info("No reviews available for detailed sentiment analysis.")
+            
+            if st.button("Close Analysis", key=f"close_sentiment_{movie['id']}_{key_suffix}"):
+                st.session_state[f"show_sentiment_{movie['id']}_{key_suffix}"] = False
+                st.rerun()
 
 
 def main():
@@ -403,7 +514,7 @@ def show_search_and_filter():
 
 
 def show_ai_recommendations():
-    """AI recommendations page"""
+    """AI recommendations page with improved movie matching"""
     st.header("🤖 AI-Powered Recommendations")
     
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -428,26 +539,64 @@ def show_ai_recommendations():
         
         if (movie_title and st.button("Get Recommendations", key="btn_content")) or (movie_title and auto_search):
             with st.spinner("Analyzing movie features..."):
-                # Fetch and prepare data
+                # First, search TMDB for the movie to get proper details
+                search_results = st.session_state.tmdb_client.search_movies(movie_title)
+                
+                found_movie = None
+                if 'results' in search_results and search_results['results']:
+                    # Get the first (best) match
+                    found_movie = st.session_state.tmdb_client.get_movie_details(
+                        search_results['results'][0]['id']
+                    )
+                    st.info(f"🎯 Found: **{found_movie.get('title')}** ({found_movie.get('release_date', '')[:4]})")
+                
+                # Fetch and prepare cached movies
                 movies = fetch_and_cache_movies(5)
+                
+                # Add the found movie to cache if not present
+                if found_movie:
+                    movie_ids = [m.get('id') for m in movies]
+                    if found_movie.get('id') not in movie_ids:
+                        movies.append(found_movie)
+                        st.session_state.movies_cache = movies
+                
                 st.session_state.recommendation_engine.prepare_data(movies)
                 
-                # Get recommendations
+                # Get recommendations using the exact title from TMDB
+                search_title = found_movie.get('title') if found_movie else movie_title
                 recommendations = st.session_state.recommendation_engine.content_based_recommendations(
-                    movie_title, 10
+                    search_title, 10
                 )
                 
                 if recommendations:
-                    st.success(f"Found {len(recommendations)} similar movies!")
-                    
-                    for idx, (movie_id, score) in enumerate(recommendations):
+                    st.session_state.ai_content_results = []
+                    for movie_id, score in recommendations:
                         movie_data = next((m for m in movies if m.get('id') == movie_id), None)
                         if movie_data:
-                            st.write(f"**Similarity Score:** {score:.2f}")
-                            display_movie_card(movie_data, key_suffix=f"ai_rec_{idx}")
-                            st.markdown("---")
+                            st.session_state.ai_content_results.append((movie_data, score))
                 else:
-                    st.warning("Movie not found in our database. Try another title.")
+                    # Try fuzzy matching as fallback
+                    recommendations = st.session_state.recommendation_engine.fuzzy_content_recommendations(
+                        movie_title, movies, 10
+                    )
+                    if recommendations:
+                        st.session_state.ai_content_results = []
+                        for movie_id, score in recommendations:
+                            movie_data = next((m for m in movies if m.get('id') == movie_id), None)
+                            if movie_data:
+                                st.session_state.ai_content_results.append((movie_data, score))
+                    else:
+                        st.session_state.ai_content_results = []
+        
+        # Display results
+        if st.session_state.ai_content_results:
+            st.success(f"Found {len(st.session_state.ai_content_results)} similar movies!")
+            for idx, (movie_data, score) in enumerate(st.session_state.ai_content_results):
+                st.write(f"**Similarity Score:** {score:.2f}")
+                display_movie_card(movie_data, key_suffix=f"ai_content_{idx}")
+                st.markdown("---")
+        elif movie_title and not st.session_state.ai_content_results:
+            st.warning("Movie not found in our database. Try another title.")
     
     with tab2:
         st.subheader("Sentiment-Based Recommendations")
@@ -464,14 +613,19 @@ def show_ai_recommendations():
                 )
                 
                 if recommendations:
-                    st.success(f"Found {len(recommendations)} movies with positive sentiment!")
-                    
+                    st.session_state.ai_sentiment_results = []
                     for title, sentiment, rating in recommendations:
                         movie_data = next((m for m in movies if m.get('title') == title), None)
                         if movie_data:
-                            st.write(f"**Sentiment:** {sentiment:.2f} | **Rating:** {rating:.1f}")
-                            display_movie_card(movie_data)
-                            st.markdown("---")
+                            st.session_state.ai_sentiment_results.append((movie_data, sentiment, rating))
+        
+        # Display results
+        if st.session_state.ai_sentiment_results:
+            st.success(f"Found {len(st.session_state.ai_sentiment_results)} movies with positive sentiment!")
+            for idx, (movie_data, sentiment, rating) in enumerate(st.session_state.ai_sentiment_results):
+                st.write(f"**Sentiment:** {sentiment:.2f} | **Rating:** {rating:.1f}")
+                display_movie_card(movie_data, key_suffix=f"ai_sentiment_{idx}")
+                st.markdown("---")
     
     with tab3:
         st.subheader("Collaborative Filtering")
@@ -500,14 +654,19 @@ def show_ai_recommendations():
                     )
                     
                     if recommendations:
-                        st.success(f"Found {len(recommendations)} recommendations based on your ratings!")
-                        
+                        st.session_state.ai_collab_results = []
                         for title, score in recommendations:
                             movie_data = next((m for m in movies if m.get('title') == title), None)
                             if movie_data:
-                                st.write(f"**Match Score:** {score:.2f}")
-                                display_movie_card(movie_data)
-                                st.markdown("---")
+                                st.session_state.ai_collab_results.append((movie_data, score))
+        
+        # Display results
+        if st.session_state.ai_collab_results:
+            st.success(f"Found {len(st.session_state.ai_collab_results)} recommendations based on your ratings!")
+            for idx, (movie_data, score) in enumerate(st.session_state.ai_collab_results):
+                st.write(f"**Match Score:** {score:.2f}")
+                display_movie_card(movie_data, key_suffix=f"ai_collab_{idx}")
+                st.markdown("---")
     
     with tab4:
         st.subheader("Hybrid Recommendations")
@@ -518,6 +677,22 @@ def show_ai_recommendations():
         if st.button("Get Hybrid Recommendations", key="btn_hybrid"):
             with st.spinner("Combining all recommendation approaches..."):
                 movies = fetch_and_cache_movies(5)
+                
+                # If user provided a movie, search for it first
+                if movie_for_hybrid:
+                    search_results = st.session_state.tmdb_client.search_movies(movie_for_hybrid)
+                    if 'results' in search_results and search_results['results']:
+                        found_movie = st.session_state.tmdb_client.get_movie_details(
+                            search_results['results'][0]['id']
+                        )
+                        if found_movie:
+                            movie_ids = [m.get('id') for m in movies]
+                            if found_movie.get('id') not in movie_ids:
+                                movies.append(found_movie)
+                                st.session_state.movies_cache = movies
+                            movie_for_hybrid = found_movie.get('title')
+                            st.info(f"🎯 Using: **{movie_for_hybrid}**")
+                
                 st.session_state.recommendation_engine.prepare_data(movies)
                 
                 user_ratings = st.session_state.watchlist_manager.get_ratings()
@@ -530,20 +705,25 @@ def show_ai_recommendations():
                 )
                 
                 if recommendations:
-                    st.success(f"Found {len(recommendations)} hybrid recommendations!")
-                    
+                    st.session_state.ai_hybrid_results = []
                     for title, score in recommendations:
                         movie_data = next((m for m in movies if m.get('title') == title), None)
                         if movie_data:
-                            st.write(f"**Hybrid Score:** {score:.2f}")
-                            display_movie_card(movie_data)
-                            st.markdown("---")
-                else:
-                    st.info("Add more ratings or specify a base movie for better results.")
+                            st.session_state.ai_hybrid_results.append((movie_data, score))
+        
+        # Display results
+        if st.session_state.ai_hybrid_results:
+            st.success(f"Found {len(st.session_state.ai_hybrid_results)} hybrid recommendations!")
+            for idx, (movie_data, score) in enumerate(st.session_state.ai_hybrid_results):
+                st.write(f"**Hybrid Score:** {score:.2f}")
+                display_movie_card(movie_data, key_suffix=f"ai_hybrid_{idx}")
+                st.markdown("---")
+        elif not movie_for_hybrid and not st.session_state.watchlist_manager.get_ratings():
+            st.info("Add more ratings or specify a base movie for better results.")
 
 
 def show_nlp_query():
-    """NLP query interface with OpenRouter AI"""
+    """NLP query interface with OpenRouter AI - with persistent results"""
     st.header("💬 Natural Language Movie Search")
     st.write("Ask for movies in plain English - powered by AI!")
     
@@ -572,13 +752,11 @@ def show_nlp_query():
     - "What are some good horror movies with at least a 7 rating?"
     """)
     
-    query = st.text_area("What kind of movies are you looking for?", height=100)
+    query = st.text_area("What kind of movies are you looking for?", height=100, value=st.session_state.nlp_last_query)
     
-    # Store NLP results in session state
-    if "nlp_results" not in st.session_state:
-        st.session_state.nlp_results = None
-    
-    if query and st.button("Search", type="primary"):
+    if query and st.button("Search", type="primary", key="nlp_search_btn"):
+        st.session_state.nlp_last_query = query
+        
         with st.spinner("Understanding your query with AI..."):
             # Use OpenRouter if available for enhanced understanding
             if st.session_state.openrouter_api_key:
@@ -646,17 +824,25 @@ def show_nlp_query():
             else:
                 filtered_movies = movies[:20]
             
+            # Store results in session state
+            st.session_state.nlp_query_results = filtered_movies[:15]
+            
             # Generate response
             if filtered_movies:
-                response = NLPInterface.generate_response(filtered_movies, query)
-                st.success(response)
-                
-                # Display results
-                for idx, movie in enumerate(filtered_movies[:15]):
-                    display_movie_card(movie, key_suffix=f"nlp_{idx}")
-                    st.markdown("---")
+                st.session_state.nlp_response_message = NLPInterface.generate_response(filtered_movies, query)
             else:
-                st.warning("No movies found matching your criteria. Try adjusting your search!")
+                st.session_state.nlp_response_message = ""
+    
+    # Display persisted results
+    if st.session_state.nlp_response_message:
+        st.success(st.session_state.nlp_response_message)
+    
+    if st.session_state.nlp_query_results:
+        for idx, movie in enumerate(st.session_state.nlp_query_results):
+            display_movie_card(movie, key_suffix=f"nlp_{idx}")
+            st.markdown("---")
+    elif st.session_state.nlp_last_query and not st.session_state.nlp_query_results:
+        st.warning("No movies found matching your criteria. Try adjusting your search!")
 
 
 def show_visualizations():
@@ -732,8 +918,8 @@ def show_trending():
         if filtered_trending:
             st.success(f"🔥 {len(filtered_trending)} trending movies!" + (f" (filtered by rating ≥ {min_rating_trending})" if min_rating_trending > 0 else ""))
             
-            for movie in filtered_trending:
-                display_movie_card(movie)
+            for idx, movie in enumerate(filtered_trending):
+                display_movie_card(movie, key_suffix=f"trending_{idx}")
                 st.markdown("---")
         else:
             st.warning(f"No trending movies found with rating ≥ {min_rating_trending}. Try lowering the filter.")
@@ -753,8 +939,8 @@ def show_watchlist():
         else:
             st.success(f"You have {len(watchlist)} movies in your watchlist")
             
-            for movie in watchlist:
-                display_movie_card(movie, show_actions=False)
+            for idx, movie in enumerate(watchlist):
+                display_movie_card(movie, show_actions=False, key_suffix=f"watchlist_{idx}")
                 
                 col1, col2 = st.columns(2)
                 with col1:
@@ -787,8 +973,8 @@ def show_watchlist():
         else:
             st.success(f"You've watched {len(watched)} movies")
             
-            for movie in watched:
-                display_movie_card(movie, show_actions=False)
+            for idx, movie in enumerate(watched):
+                display_movie_card(movie, show_actions=False, key_suffix=f"watched_list_{idx}")
                 
                 # Show user's rating
                 ratings = st.session_state.watchlist_manager.get_ratings()
